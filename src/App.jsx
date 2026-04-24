@@ -1,4 +1,5 @@
 import React, { useMemo, useState } from "react";
+import greenDotLogo from "./assets/greendot-logo.png";
 
 const Card = ({ children, className = "" }) => (
   <div className={`rounded-2xl border border-slate-200 bg-white ${className}`}>{children}</div>
@@ -413,40 +414,37 @@ export default function GreenDotSqlSizingCalculator() {
 
   return (
     <div className="min-h-screen bg-slate-50 text-slate-900 print:bg-white">
-      <div className="mx-auto max-w-7xl p-4 md:p-6 print:max-w-none print:p-6">
-        <div className="mb-6 flex flex-col gap-4 print:mb-4">
-          <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
-            <div>
-              <div className="flex items-center gap-2 mb-1">
-                <span className="w-3 h-3 rounded-full bg-green-600 inline-block shrink-0" />
-                <span className="text-2xl font-bold text-green-600 tracking-tight">GreenDot</span>
-                <span className="text-2xl font-semibold text-slate-700 tracking-tight">SQL Sizing Calculator</span>
-              </div>
-              <p className="mt-1 max-w-3xl text-sm text-slate-500">
-                eyePower PDU — SQL Storage Sizing &amp; Scenario Planner
-              </p>
-            </div>
-            <div className="flex flex-wrap gap-2 print:hidden">
-              {[
-                { key: "conservative", label: "Conservative" },
-                { key: "recommended", label: "Recommended" },
-                { key: "realistic", label: "Realistic Advanced" },
-                { key: "heavy", label: "Heavy Retention" },
-              ].map(({ key, label }) => (
-                <Button
-                  key={key}
-                  onClick={() => applyPreset(key)}
-                  className={activePreset === key ? "!bg-green-600 !text-white !border-green-600 hover:!bg-green-700" : ""}
-                >
-                  {label}
-                </Button>
-              ))}
-              <Button onClick={() => window.print()} className="gap-2">
-                <Printer className="h-4 w-4" />
-                Print to PDF
-              </Button>
-            </div>
+      {/* Dark logo header */}
+      <div className="bg-slate-950 print:hidden">
+        <div className="mx-auto max-w-7xl px-4 md:px-6 py-3 flex items-center gap-5">
+          <img src={greenDotLogo} alt="GreenDot by Dot Group" className="h-14 w-auto" />
+          <div className="border-l border-slate-700 pl-5">
+            <p className="text-white font-semibold text-base leading-tight">SQL Sizing Calculator</p>
+            <p className="text-slate-400 text-xs mt-1">eyePower PDU — Storage Sizing &amp; Scenario Planner</p>
           </div>
+        </div>
+      </div>
+
+      <div className="mx-auto max-w-7xl p-4 md:p-6 print:max-w-none print:p-6">
+        <div className="mb-6 print:mb-4 flex flex-wrap gap-2 print:hidden">
+          {[
+            { key: "conservative", label: "Conservative" },
+            { key: "recommended", label: "Recommended" },
+            { key: "realistic", label: "Realistic Advanced" },
+            { key: "heavy", label: "Heavy Retention" },
+          ].map(({ key, label }) => (
+            <Button
+              key={key}
+              onClick={() => applyPreset(key)}
+              className={activePreset === key ? "!bg-green-600 !text-white !border-green-600 hover:!bg-green-700" : ""}
+            >
+              {label}
+            </Button>
+          ))}
+          <Button onClick={() => window.print()} className="gap-2">
+            <Printer className="h-4 w-4" />
+            Print to PDF
+          </Button>
         </div>
 
         <div className="grid grid-cols-1 gap-6 xl:grid-cols-[360px_minmax(0,1fr)] print:grid-cols-1">
