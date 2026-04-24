@@ -79,7 +79,7 @@ import {
   Line,
   Legend,
 } from "recharts";
-import { Printer, Database, Gauge, HardDrive, Layers3, Activity } from "lucide-react";
+import { Printer, Database, Gauge, HardDrive, Layers3, Activity, HelpCircle, X } from "lucide-react";
 
 const DAYS_PER_MONTH = 30.4375;
 const DAYS_PER_YEAR = 365.25;
@@ -255,10 +255,226 @@ const KPI = ({ title, value, subtext, icon: Icon }) => (
   </Card>
 );
 
+const Section = ({ title, children }) => (
+  <div className="mb-6">
+    <h3 className="text-base font-semibold text-slate-800 mb-3 pb-2 border-b border-slate-200">{title}</h3>
+    {children}
+  </div>
+);
+
+const Term = ({ label, children }) => (
+  <div className="mb-3">
+    <p className="text-sm font-semibold text-slate-700">{label}</p>
+    <p className="text-sm text-slate-500 mt-0.5">{children}</p>
+  </div>
+);
+
+function GuideModal({ onClose }) {
+  return (
+    <div className="fixed inset-0 z-50 flex items-start justify-center bg-black/50 p-4 overflow-y-auto">
+      <div className="relative w-full max-w-2xl bg-white rounded-2xl shadow-xl my-8">
+        <div className="sticky top-0 bg-white rounded-t-2xl border-b border-slate-200 px-6 py-4 flex items-center justify-between z-10">
+          <h2 className="text-lg font-semibold text-slate-800">Calculator Guide</h2>
+          <button onClick={onClose} className="rounded-lg p-1.5 hover:bg-slate-100 text-slate-500">
+            <X className="h-5 w-5" />
+          </button>
+        </div>
+        <div className="px-6 py-6">
+
+          <Section title="What does this calculator do?">
+            <p className="text-sm text-slate-500">
+              This tool estimates how much SQL database storage you will need to collect and retain telemetry data from
+              eyePower PDUs over time. Adjust the inputs and every output — records per hour, annual storage,
+              provisioned footprint — updates instantly. Use it to compare scenarios, plan infrastructure capacity,
+              and present storage requirements to technical or commercial stakeholders.
+            </p>
+          </Section>
+
+          <Section title="Key concepts">
+            <Term label="PDU — Power Distribution Unit">
+              A managed device that monitors and controls electrical outlets in a rack or data centre. Each PDU
+              continuously measures things like voltage, current, outlet states, and temperature.
+            </Term>
+            <Term label="Telemetry">
+              The stream of measurements a PDU reports each time it is polled. A full snapshot covers up to 43
+              data points — relay states, voltages, currents, temperatures, and more — totalling 181 bytes of
+              payload before any database overhead is added.
+            </Term>
+            <Term label="Polling">
+              The act of asking a device "what are your current readings?" at a regular interval. Shorter intervals
+              produce more records per hour, which directly increases storage consumption.
+            </Term>
+            <Term label="Record">
+              One row stored in the database, representing one poll response from one PDU. The total number of
+              records per year is the foundation of every storage calculation.
+            </Term>
+          </Section>
+
+          <Section title="Simple mode vs Advanced mode">
+            <Term label="Simple mode">
+              Treats every PDU as producing one standard-sized data packet at a single, averaged polling interval.
+              This is the fastest way to produce a headline estimate and is ideal for early planning or
+              management-facing conversations where precision is less important than speed.
+            </Term>
+            <Term label="Advanced mode">
+              Reflects how the eyePower device actually works: different categories of data change at different
+              rates and are polled at different intervals. Fast-changing operational data (relay states, alarms)
+              is captured frequently; slowly-changing environmental data (temperature, humidity) is captured less
+              often. This produces a more accurate storage estimate for production sizing and infrastructure
+              procurement.
+            </Term>
+          </Section>
+
+          <Section title="The three polling tiers (Advanced mode)">
+            <div className="overflow-x-auto rounded-xl border border-slate-200">
+              <table className="w-full text-sm border-collapse">
+                <thead>
+                  <tr className="bg-slate-50">
+                    <th className="px-4 py-2 text-left font-semibold text-slate-700">Tier</th>
+                    <th className="px-4 py-2 text-left font-semibold text-slate-700">What it measures</th>
+                    <th className="px-4 py-2 text-right font-semibold text-slate-700">Default interval</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr className="border-t border-slate-200">
+                    <td className="px-4 py-2 font-medium text-slate-700">Fast</td>
+                    <td className="px-4 py-2 text-slate-500">Relay states, outlet states, fuse status, alarms, cycle timers, digital inputs</td>
+                    <td className="px-4 py-2 text-right text-slate-700">10 s</td>
+                  </tr>
+                  <tr className="border-t border-slate-200">
+                    <td className="px-4 py-2 font-medium text-slate-700">Medium</td>
+                    <td className="px-4 py-2 text-slate-500">Voltages, currents, frequency, power, earth leakage</td>
+                    <td className="px-4 py-2 text-right text-slate-700">30 s</td>
+                  </tr>
+                  <tr className="border-t border-slate-200">
+                    <td className="px-4 py-2 font-medium text-slate-700">Slow</td>
+                    <td className="px-4 py-2 text-slate-500">Temperature, humidity, internal board voltages, PSU health</td>
+                    <td className="px-4 py-2 text-right text-slate-700">60 s</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </Section>
+
+          <Section title="Preset scenarios">
+            <Term label="Conservative">
+              A cautious estimate using 50 PDUs and 30-second polling with minimal overhead assumptions. Use this
+              when you want a floor figure or are working with a cost-sensitive audience.
+            </Term>
+            <Term label="Recommended">
+              The balanced default: 100 PDUs, 15-second polling, 30% index overhead. A reliable starting point
+              for most deployments and the figure most commonly cited in planning discussions.
+            </Term>
+            <Term label="Realistic Advanced">
+              Uses tiered polling (Fast 10 s / Medium 30 s / Slow 60 s) with a 2-year retention window. The
+              most accurate pre-production estimate once the polling strategy has been agreed.
+            </Term>
+            <Term label="Heavy Retention">
+              Models a large estate (250 PDUs) with 3-year retention, data replication, and backup storage.
+              Use this to size the upper boundary of infrastructure requirements or for worst-case procurement
+              conversations.
+            </Term>
+          </Section>
+
+          <Section title="Controls explained">
+            <Term label="Number of PDUs">
+              How many eyePower units will be monitored. Records per hour — and therefore all storage figures —
+              scale directly with this number.
+            </Term>
+            <Term label="Simple polling interval">
+              In Simple mode, how often (in seconds) each PDU is queried. At 15 seconds, one PDU produces
+              240 records per hour; at 30 seconds, it produces 120.
+            </Term>
+            <Term label="Fast / Medium / Slow poll">
+              In Advanced mode, the independent polling interval for each telemetry tier. These can be adjusted
+              separately to match the actual collection schedule configured on your collector.
+            </Term>
+            <Term label="Metadata bytes (default: 28)">
+              Every database record includes fixed identifying fields alongside the telemetry payload — device ID,
+              collector ID, timestamp, status flags. These are estimated at 28 bytes per record and do not change
+              regardless of which metrics are collected.
+            </Term>
+            <Term label="SQL row overhead (default: 24)">
+              Every row in a SQL database carries a small amount of internal bookkeeping data managed by the
+              database engine itself (row headers, null bitmaps, forwarding pointers). 24 bytes is a conservative
+              estimate for SQL Server.
+            </Term>
+            <Term label="Index overhead % (default: 30%)">
+              Databases build indexes to make queries fast. These indexes consume storage in addition to the
+              table data — typically 20–40% of the base table size. 30% is realistic for a table with a primary
+              key and two or three secondary indexes on device ID and timestamp.
+            </Term>
+            <Term label="Compression % (default: 0%)">
+              If your database or storage tier uses compression, enter the estimated reduction here. SQL Server
+              page compression on structured telemetry data typically achieves 20–40% reduction. Leave at 0%
+              if compression has not been confirmed.
+            </Term>
+            <Term label="Parsed copy factor (default: 1.0)">
+              The raw packet stores all telemetry as a compact binary or JSON payload. A parsed copy explodes
+              each metric into its own queryable column, which makes reporting easier but approximately doubles
+              storage. Set to 1.0 for raw storage only; 2.0 for raw plus a full parsed copy; 1.5 for raw plus
+              a partial parsed view covering key metrics only.
+            </Term>
+            <Term label="Retention years">
+              How many years of historical data will be kept in the live database. Data beyond this window is
+              assumed to be archived to cheaper storage or deleted.
+            </Term>
+            <Term label="Growth headroom % (default: 20%)">
+              A safety buffer added above the calculated retention volume. It accounts for more PDUs being
+              added over time, polling intervals being shortened, or additional metrics being enabled. 20% is
+              a standard infrastructure planning allowance.
+            </Term>
+            <Term label="Replica factor (default: 1)">
+              If your database is mirrored or replicated for high availability, the total physical storage is
+              multiplied by this value. Set to 2 for one primary plus one synchronous replica; 3 for two
+              replicas (common in Always On Availability Groups).
+            </Term>
+            <Term label="Backup factor (default: 1)">
+              An additional multiplier covering backup storage kept separately from the live database — for
+              example, full backups retained on a NAS or object storage. Set to 1.2 if backup storage is
+              approximately 20% of live volume; higher if multiple backup generations are retained.
+            </Term>
+          </Section>
+
+          <Section title="Understanding the outputs">
+            <Term label="Annual Storage">
+              The volume of data the system will produce in one year, calculated from the effective record
+              size and records per year. This is the raw data figure before retention multiplication,
+              headroom, or replication are applied.
+            </Term>
+            <Term label="Provisioned Footprint">
+              The total storage that should be physically provisioned: Annual Storage × Retention Years ×
+              (1 + Headroom%) × Replica Factor × Backup Factor. This is the number to give to your
+              infrastructure or cloud team when ordering capacity.
+            </Term>
+            <Term label="Scenario Matrix">
+              A reference grid showing annual storage across different combinations of PDU count and polling
+              interval using Simple mode assumptions. Use it to quickly compare options without adjusting
+              the sliders one by one.
+            </Term>
+            <Term label="Simple vs Advanced Comparison chart">
+              Shows the storage difference between Simple mode (one blended packet per poll) and Advanced
+              mode (separate Fast / Medium / Slow tiers). Advanced mode is typically 15–25% larger because
+              the Fast tier generates significantly more records than a blended average suggests.
+            </Term>
+            <Term label="Retention Growth chart">
+              Projects how total retained storage grows year on year under the current settings. The
+              Provisioned line includes headroom, replication, and backup multipliers on top of raw retained
+              data.
+            </Term>
+          </Section>
+
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function GreenDotSqlSizingCalculator() {
   const [form, setForm] = useState(presets.recommended);
   const [showTelemetry, setShowTelemetry] = useState(false);
   const [activePreset, setActivePreset] = useState("recommended");
+  const [showGuide, setShowGuide] = useState(false);
 
   const update = (key, value) => {
     setForm((prev) => ({ ...prev, [key]: value }));
@@ -445,7 +661,12 @@ export default function GreenDotSqlSizingCalculator() {
             <Printer className="h-4 w-4" />
             Print to PDF
           </Button>
+          <Button onClick={() => setShowGuide(true)} className="gap-2">
+            <HelpCircle className="h-4 w-4" />
+            Guide
+          </Button>
         </div>
+        {showGuide && <GuideModal onClose={() => setShowGuide(false)} />}
 
         <div className="grid grid-cols-1 gap-6 xl:grid-cols-[360px_minmax(0,1fr)] print:grid-cols-1">
           <div className="space-y-6 print:hidden">
