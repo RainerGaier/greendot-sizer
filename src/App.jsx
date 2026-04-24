@@ -70,6 +70,7 @@ const Switch = ({ checked, onCheckedChange }) => (
 import {
   BarChart,
   Bar,
+  Cell,
   XAxis,
   YAxis,
   CartesianGrid,
@@ -79,10 +80,57 @@ import {
   Line,
   Legend,
 } from "recharts";
-import { Printer, Database, Gauge, HardDrive, Layers3, Activity, HelpCircle, X } from "lucide-react";
+import { Printer, Database, Gauge, HardDrive, Layers3, Activity, HelpCircle, X, DollarSign, Cloud } from "lucide-react";
 
 const DAYS_PER_MONTH = 30.4375;
 const DAYS_PER_YEAR = 365.25;
+
+const PROVIDERS = [
+  {
+    id: "aws", name: "AWS", fullName: "Amazon RDS for SQL Server",
+    color: "#FF9900", region: "us-east-1",
+    pricing: {
+      premium:  { rate: 0.125, label: "io1 Provisioned IOPS SSD" },
+      standard: { rate: 0.115, label: "gp3 General Purpose SSD" },
+      archive:  { rate: 0.004, label: "S3 Glacier Flexible Retrieval" },
+    },
+  },
+  {
+    id: "azure", name: "Azure", fullName: "Azure SQL Managed Instance",
+    color: "#0078D4", region: "East US",
+    pricing: {
+      premium:  { rate: 0.230, label: "Business Critical tier" },
+      standard: { rate: 0.115, label: "General Purpose tier" },
+      archive:  { rate: 0.001, label: "Blob Storage Archive tier" },
+    },
+  },
+  {
+    id: "gcp", name: "Google Cloud", fullName: "Cloud SQL for SQL Server",
+    color: "#4285F4", region: "us-central1",
+    pricing: {
+      premium:  { rate: 0.170, label: "SSD persistent disk" },
+      standard: { rate: 0.090, label: "HDD persistent disk" },
+      archive:  { rate: 0.007, label: "Coldline Storage" },
+    },
+  },
+  {
+    id: "ibm", name: "IBM Cloud", fullName: "Db2 on Cloud",
+    color: "#1F70C1", region: "us-south",
+    pricing: {
+      premium:  { rate: 0.220, label: "Performance tier" },
+      standard: { rate: 0.150, label: "Standard tier" },
+      archive:  { rate: 0.007, label: "Cold Vault Object Storage" },
+    },
+  },
+];
+
+const formatCurrency = (value) =>
+  new Intl.NumberFormat("en-US", {
+    style: "currency",
+    currency: "USD",
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 0,
+  }).format(value);
 
 const formatNumber = (value, decimals = 0) =>
   new Intl.NumberFormat("en-ZA", {
@@ -470,11 +518,179 @@ function GuideModal({ onClose }) {
   );
 }
 
+function CostTab({ sizing, storageTier, setStorageTier }) {
+  const provisionedGB = sizing.provisionedBytes / 1024 ** 3;
+
+  const tiers = [
+    { key: "premium",  label: "Premium SSD",    desc: "High-performance, low-latency. For active telemetry in production." },
+    { key: "standard", label: "Standard SSD",   desc: "General-purpose managed database storage." },
+    { key: "archive",  label: "Archive / Cold",  desc: "Object storage for historical data. Not directly queryable from SQL." },
+  ];
+
+  const costData = PROVIDERS.map((p) => {
+    const { rate, label } = p.pricing[storageTier];
+    const monthly = provisionedGB * rate;
+    return { ...p, rate, tierLabel: label, monthly, annual: monthly * 12 };
+  });
+
+  const cheapest = costData.reduce((a, b) => (a.annual < b.annual ? a : b));
+  const priciest = costData.reduce((a, b) => (a.annual > b.annual ? a : b));
+
+  const chartData = costData.map((p) => ({
+    name: p.name,
+    Annual: Math.round(p.annual),
+    fill: p.color,
+  }));
+
+  return (
+    <div className="space-y-6">
+      {/* Storage tier selector */}
+      <Card className="rounded-2xl shadow-sm">
+        <CardHeader>
+          <CardTitle>Storage Tier</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="flex flex-wrap gap-2">
+            {tiers.map((t) => (
+              <button
+                key={t.key}
+                onClick={() => setStorageTier(t.key)}
+                className={`rounded-xl px-4 py-2 text-sm font-medium border transition-colors ${
+                  storageTier === t.key
+                    ? "bg-green-600 text-white border-green-600"
+                    : "bg-white text-slate-700 border-slate-300 hover:bg-slate-50"
+                }`}
+              >
+                {t.label}
+              </button>
+            ))}
+          </div>
+          <p className="mt-3 text-xs text-slate-500">
+            {tiers.find((t) => t.key === storageTier)?.desc}
+            {storageTier === "archive" && (
+              <span className="ml-1 font-semibold text-amber-600">
+                Archive pricing reflects object storage — not a live queryable SQL database.
+              </span>
+            )}
+          </p>
+        </CardContent>
+      </Card>
+
+      {/* Summary KPIs */}
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+        <KPI title="Provisioned Storage" value={formatBytes(sizing.provisionedBytes)} subtext="Basis for all cost estimates" icon={HardDrive} />
+        <KPI title="Lowest Annual Cost" value={formatCurrency(cheapest.annual)} subtext={`${cheapest.name} — ${cheapest.tierLabel}`} icon={DollarSign} />
+        <KPI title="Highest Annual Cost" value={formatCurrency(priciest.annual)} subtext={`${priciest.name} — ${priciest.tierLabel}`} icon={Cloud} />
+      </div>
+
+      {/* Provider cards */}
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
+        {costData.map((p) => (
+          <Card key={p.id} className={`rounded-2xl shadow-sm overflow-hidden ${p.id === cheapest.id ? "ring-2 ring-green-500" : ""}`}>
+            <div className="h-1.5" style={{ backgroundColor: p.color }} />
+            <CardContent className="p-5 space-y-3">
+              <div>
+                <p className="text-base font-bold text-slate-800">{p.name}</p>
+                <p className="text-xs text-slate-500 mt-0.5">{p.fullName}</p>
+                <p className="text-xs text-slate-400 mt-0.5">{p.tierLabel}</p>
+                <p className="text-xs text-slate-400">{p.region}</p>
+              </div>
+              <div className="border-t pt-3 space-y-1.5">
+                <div className="flex items-baseline justify-between">
+                  <span className="text-xs text-slate-500">Monthly</span>
+                  <span className="text-sm font-semibold text-slate-700">{formatCurrency(p.monthly)}</span>
+                </div>
+                <div className="flex items-baseline justify-between">
+                  <span className="text-xs text-slate-500">Annual</span>
+                  <span className="text-xl font-bold text-slate-900">{formatCurrency(p.annual)}</span>
+                </div>
+                <p className="text-xs text-slate-400">{formatNumber(provisionedGB, 1)} GB × ${p.rate.toFixed(3)}/GB/mo</p>
+              </div>
+              {p.id === cheapest.id && (
+                <div className="rounded-lg bg-green-50 px-2 py-1 text-xs font-medium text-green-700 text-center">
+                  Lowest cost
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        ))}
+      </div>
+
+      {/* Comparison bar chart */}
+      <Card className="rounded-2xl shadow-sm">
+        <CardHeader>
+          <CardTitle>Annual Cost Comparison</CardTitle>
+        </CardHeader>
+        <CardContent className="h-[300px]">
+          <ResponsiveContainer width="100%" height="100%">
+            <BarChart data={chartData}>
+              <CartesianGrid strokeDasharray="3 3" />
+              <XAxis dataKey="name" />
+              <YAxis tickFormatter={(v) => `$${formatNumber(v / 1000, 0)}k`} width={70} />
+              <Tooltip formatter={(value) => [formatCurrency(value), "Annual Cost"]} />
+              <Bar dataKey="Annual" radius={[8, 8, 0, 0]}>
+                {chartData.map((entry) => (
+                  <Cell key={entry.name} fill={entry.fill} />
+                ))}
+              </Bar>
+            </BarChart>
+          </ResponsiveContainer>
+        </CardContent>
+      </Card>
+
+      {/* Breakdown table */}
+      <Card className="rounded-2xl shadow-sm">
+        <CardHeader>
+          <CardTitle>Cost Breakdown Table</CardTitle>
+        </CardHeader>
+        <CardContent className="overflow-x-auto">
+          <table className="w-full min-w-[700px] border-collapse text-sm">
+            <thead>
+              <tr>
+                <th className="border-b px-3 py-2 text-left">Provider</th>
+                <th className="border-b px-3 py-2 text-left">Service</th>
+                <th className="border-b px-3 py-2 text-left">Storage tier</th>
+                <th className="border-b px-3 py-2 text-right">$/GB/month</th>
+                <th className="border-b px-3 py-2 text-right">Provisioned GB</th>
+                <th className="border-b px-3 py-2 text-right">Monthly</th>
+                <th className="border-b px-3 py-2 text-right font-semibold">Annual</th>
+              </tr>
+            </thead>
+            <tbody>
+              {costData.map((p) => (
+                <tr key={p.id} className={p.id === cheapest.id ? "bg-green-50" : ""}>
+                  <td className="border-b px-3 py-2 font-semibold" style={{ color: p.color }}>{p.name}</td>
+                  <td className="border-b px-3 py-2 text-slate-600">{p.fullName}</td>
+                  <td className="border-b px-3 py-2 text-slate-500">{p.tierLabel}</td>
+                  <td className="border-b px-3 py-2 text-right">${p.rate.toFixed(3)}</td>
+                  <td className="border-b px-3 py-2 text-right">{formatNumber(provisionedGB, 1)}</td>
+                  <td className="border-b px-3 py-2 text-right">{formatCurrency(p.monthly)}</td>
+                  <td className="border-b px-3 py-2 text-right font-semibold">{formatCurrency(p.annual)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          <p className="mt-2 text-xs text-slate-400">Highlighted row = lowest annual cost for the selected storage tier.</p>
+        </CardContent>
+      </Card>
+
+      {/* Disclaimer */}
+      <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4">
+        <p className="text-xs text-amber-800 leading-relaxed">
+          <span className="font-semibold">Indicative pricing only.</span> Rates shown are public list prices for reference US regions (AWS us-east-1, Azure East US, Google us-central1, IBM us-south) as of Q1 2026. Archive / Cold tier pricing reflects object storage services — data at this tier is not directly queryable from a live SQL database and is suitable for long-term archival only. Actual costs vary by region, committed-use or reserved-instance discounts, support tier, licensing model, and negotiated enterprise agreements. Always verify current pricing against each provider's official pricing calculator before making procurement decisions.
+        </p>
+      </div>
+    </div>
+  );
+}
+
 export default function GreenDotSqlSizingCalculator() {
   const [form, setForm] = useState(presets.recommended);
   const [showTelemetry, setShowTelemetry] = useState(false);
   const [activePreset, setActivePreset] = useState("recommended");
   const [showGuide, setShowGuide] = useState(false);
+  const [activeTab, setActiveTab] = useState("sizing");
+  const [storageTier, setStorageTier] = useState("standard");
 
   const update = (key, value) => {
     setForm((prev) => ({ ...prev, [key]: value }));
@@ -641,31 +857,55 @@ export default function GreenDotSqlSizingCalculator() {
         </div>
       </div>
 
-      <div className="mx-auto max-w-7xl p-4 md:p-6 print:max-w-none print:p-6">
-        <div className="mb-6 print:mb-4 flex flex-wrap gap-2 print:hidden">
+      {/* Tab navigation */}
+      <div className="bg-white border-b border-slate-200 print:hidden">
+        <div className="mx-auto max-w-7xl px-4 md:px-6 flex gap-1">
           {[
-            { key: "conservative", label: "Conservative" },
-            { key: "recommended", label: "Recommended" },
-            { key: "realistic", label: "Realistic Advanced" },
-            { key: "heavy", label: "Heavy Retention" },
+            { key: "sizing", label: "Sizing Calculator" },
+            { key: "costs", label: "Provider Cost Estimates" },
           ].map(({ key, label }) => (
-            <Button
+            <button
               key={key}
-              onClick={() => applyPreset(key)}
-              className={activePreset === key ? "!bg-green-600 !text-white !border-green-600 hover:!bg-green-700" : ""}
+              onClick={() => setActiveTab(key)}
+              className={`px-4 py-3 text-sm font-medium border-b-2 transition-colors ${
+                activeTab === key
+                  ? "border-green-600 text-green-700"
+                  : "border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300"
+              }`}
             >
               {label}
-            </Button>
+            </button>
           ))}
-          <Button onClick={() => window.print()} className="gap-2">
-            <Printer className="h-4 w-4" />
-            Print to PDF
-          </Button>
-          <Button onClick={() => setShowGuide(true)} className="gap-2">
-            <HelpCircle className="h-4 w-4" />
-            Guide
-          </Button>
         </div>
+      </div>
+
+      <div className="mx-auto max-w-7xl p-4 md:p-6 print:max-w-none print:p-6">
+        {activeTab === "sizing" && (
+          <div className="mb-6 print:mb-4 flex flex-wrap gap-2 print:hidden">
+            {[
+              { key: "conservative", label: "Conservative" },
+              { key: "recommended", label: "Recommended" },
+              { key: "realistic", label: "Realistic Advanced" },
+              { key: "heavy", label: "Heavy Retention" },
+            ].map(({ key, label }) => (
+              <Button
+                key={key}
+                onClick={() => applyPreset(key)}
+                className={activePreset === key ? "!bg-green-600 !text-white !border-green-600 hover:!bg-green-700" : ""}
+              >
+                {label}
+              </Button>
+            ))}
+            <Button onClick={() => window.print()} className="gap-2">
+              <Printer className="h-4 w-4" />
+              Print to PDF
+            </Button>
+            <Button onClick={() => setShowGuide(true)} className="gap-2">
+              <HelpCircle className="h-4 w-4" />
+              Guide
+            </Button>
+          </div>
+        )}
         {showGuide && <GuideModal onClose={() => setShowGuide(false)} />}
 
         <div className="grid grid-cols-1 gap-6 xl:grid-cols-[360px_minmax(0,1fr)] print:grid-cols-1">
@@ -768,6 +1008,7 @@ export default function GreenDotSqlSizingCalculator() {
             </Card>
           </div>
 
+          {activeTab === "sizing" ? (
           <div className="space-y-6">
             <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
               <KPI title="Active Mode" value={form.mode === "simple" ? "Simple" : "Advanced"} subtext={form.mode === "simple" ? `${form.pollIntervalSec}s average interval` : `Fast ${form.fastPollSec}s / Medium ${form.mediumPollSec}s / Slow ${form.slowPollSec}s`} icon={Gauge} />
@@ -941,6 +1182,9 @@ export default function GreenDotSqlSizingCalculator() {
               <KPI title="Shared Fixed Bytes" value={`${formatNumber(sizing.sharedFixedBytes)} bytes`} subtext="Metadata plus SQL row overhead" icon={Database} />
             </div>
           </div>
+          ) : (
+            <CostTab sizing={sizing} storageTier={storageTier} setStorageTier={setStorageTier} />
+          )}
         </div>
       </div>
 
