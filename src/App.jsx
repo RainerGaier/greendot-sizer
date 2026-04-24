@@ -9,7 +9,7 @@ const CardHeader = ({ children, className = "" }) => (
 );
 
 const CardTitle = ({ children, className = "" }) => (
-  <h2 className={`text-lg font-semibold ${className}`}>{children}</h2>
+  <h2 className={`text-lg font-semibold text-slate-800 ${className}`}>{children}</h2>
 );
 
 const CardContent = ({ children, className = "" }) => (
@@ -247,7 +247,7 @@ const KPI = ({ title, value, subtext, icon: Icon }) => (
           {subtext ? <p className="mt-1 text-xs text-slate-500">{subtext}</p> : null}
         </div>
         <div className="rounded-2xl bg-slate-100 p-3">
-          <Icon className="h-5 w-5" />
+          <Icon className="h-5 w-5 text-slate-600" />
         </div>
       </div>
     </CardContent>
@@ -436,7 +436,7 @@ export default function GreenDotSqlSizingCalculator() {
                 <Button
                   key={key}
                   onClick={() => applyPreset(key)}
-                  className={activePreset === key ? "bg-green-600 text-white border-green-600 hover:bg-green-700" : ""}
+                  className={activePreset === key ? "!bg-green-600 !text-white !border-green-600 hover:!bg-green-700" : ""}
                 >
                   {label}
                 </Button>
