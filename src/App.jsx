@@ -1071,7 +1071,7 @@ export default function GreenDotSqlSizingCalculator() {
                   ))}
                   <div className="flex items-center justify-between rounded-xl border border-dashed p-3 font-medium">
                     <span>Total logical payload</span>
-                    <span>{totalTelemetryBytes} bytes</span>
+                    <span>{sizing.simpleBaseRecordBytes} bytes</span>
                   </div>
                 </CardContent>
               </Card>
